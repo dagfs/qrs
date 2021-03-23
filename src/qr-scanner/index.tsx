@@ -17,9 +17,11 @@ const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
 
   const canvasRef = React.useRef<HTMLCanvasElement>(null)
 
-  const [context, setContext] = React.useState<CanvasRenderingContext2D | null>(null)
+  const [context, setContext] = React.useState<CanvasRenderingContext2D | null>(
+    null
+  );
 
-  const tick = (): void => {
+  const tick = (stream: MediaStream): void => {
     if (canvasRef.current && context && video.readyState === video.HAVE_ENOUGH_DATA) {
       canvasRef.current.height = video.videoHeight
       canvasRef.current.width = video.videoWidth
@@ -30,11 +32,15 @@ const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
         inversionAttempts: "dontInvert"
       })
       if (code) {
+        stream?.getTracks().forEach((t) => {
+          t.stop();
+        });
         onChange(code.data)
+        
         return
       }
     }
-    requestAnimationFrame(tick)
+    requestAnimationFrame(() => tick(stream));
   }
 
   React.useEffect(() => {
@@ -47,13 +53,11 @@ const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
     }
     if (context) {
       // Use facingMode: environment to attemt to get the front camera on phones
-      console.log(navigator)
-      console.log(navigator.mediaDevices)
       navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function (stream) {
         video.srcObject = stream
         video.setAttribute("playsinline", "true") // required to tell iOS safari we don't want fullscreen
         video.play()
-        requestAnimationFrame(tick)
+        requestAnimationFrame(() => tick(stream))
       })
     }
   }, [context])
