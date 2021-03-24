@@ -6,11 +6,12 @@ import { QRScanner } from './qr-scanner';
 function App() {
   const [value, setValue] = useState("")
    return (
-    <div className="App">
-      <div>{value}</div>
-      <QRScanner onChange={setValue} label="scan qr"/>
-    </div>
-  );
+     <div className="App">
+       <div>{value}</div>
+       
+       <QRScanner onChange={setValue} label="scan qr" />
+     </div>
+   );
 }
 
 export default App;

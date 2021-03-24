@@ -1,80 +1,94 @@
-import jsQR from "jsqr"
-import React, { useState } from "react"
-import "./index.css"
+import jsQR from "jsqr";
+import React, { useState } from "react";
+import "./index.css";
 
 /*
 Based on https://github.com/cozmo/jsQR/blob/master/docs/index.html 
 and https://betterprogramming.pub/add-an-html-canvas-into-your-react-app-176dab099a79
-
 */
 
 type ScannerProps = {
-  onChange: (code: string) => void
-}
+  onChange: (code: string) => void;
+};
 
 const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
-  const video = document.createElement("video")
+  const canvas = document.createElement("canvas");
+  const canvasCtx = canvas.getContext("2d");
 
-  const canvasRef = React.useRef<HTMLCanvasElement>(null)
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const [video, setVideo] = useState<HTMLVideoElement | null>(null);
 
-  const [context, setContext] = React.useState<CanvasRenderingContext2D | null>(
-    null
-  );
+  const tick = (): void => {
+    if (
+      canvas &&
+      canvasCtx &&
+      video &&
+      video.readyState === video.HAVE_ENOUGH_DATA
+    ) {
+      canvas.height = video.videoHeight;
+      canvas.width = video.videoWidth;
 
-  const tick = (stream: MediaStream): void => {
-    if (canvasRef.current && context && video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvasRef.current.height = video.videoHeight
-      canvasRef.current.width = video.videoWidth
-
-      context.drawImage(video, 0, 0, video.videoHeight, video.videoWidth)
-      const imageData = context.getImageData(0, 0, video.videoHeight, video.videoWidth)
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: "dontInvert"
-      })
-      if (code) {
-        stream?.getTracks().forEach((t) => {
-          t.stop();
+      canvasCtx.drawImage(video, 0, 0, video.videoHeight, video.videoWidth);
+      const imageData = canvasCtx.getImageData(
+        0,
+        0,
+        video.videoHeight,
+        video.videoWidth
+      );
+      try {
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
         });
-        onChange(code.data)
-        
-        return
+        if (code) {
+          onChange(code.data);
+          return;
+        }
+      } catch (error) {
+        if (error! instanceof RangeError) throw error;
       }
     }
-    requestAnimationFrame(() => tick(stream));
-  }
+    requestAnimationFrame(tick);
+  };
 
   React.useEffect(() => {
-    if (canvasRef.current) {
-      const renderCtx = canvasRef.current.getContext("2d")
-
-      if (renderCtx) {
-        setContext(renderCtx)
-      }
+    let stream: MediaStream;
+    if (videoRef.current) {
+      setVideo(videoRef.current);
     }
-    if (context) {
-      // Use facingMode: environment to attemt to get the front camera on phones
-      navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } }).then(function (stream) {
-        video.srcObject = stream
-        video.setAttribute("playsinline", "true") // required to tell iOS safari we don't want fullscreen
-        video.play()
-        requestAnimationFrame(() => tick(stream))
-      })
+    if (video) {
+      navigator.mediaDevices
+        .getUserMedia({ video: { facingMode: "environment" } })
+        .then(function (s) {
+          stream = s;
+          video.srcObject = stream;
+          video.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
+          video.play();
+          requestAnimationFrame(tick);
+        });
     }
-  }, [context])
+    const cleanup = (): void => {
+      // release webcam when it is no longer needed
+      stream?.getTracks().forEach((t) => {
+        t.stop();
+      });
+    };
+    return cleanup;
+  }, [video]);
 
   return (
     <div className="scanner">
-      <canvas className="scanner__canvas" ref={canvasRef}></canvas>
+      <video className="scanner__video" ref={videoRef}></video>
+        <button onClick={() => onChange("")}>Avbryt</button>
     </div>
-  )
-}
+  );
+};
 
 type QRScannerProps = {
-  onChange: (code: string) => void
-  label: string
-}
+  onChange: (code: string) => void;
+  label: string;
+};
 export const QRScanner = ({ onChange, label }: QRScannerProps): JSX.Element => {
-  const [showQRScanner, setShowQRScanner] = useState(false)
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   return (
     <div className="qr-scanner">
@@ -89,4 +103,4 @@ export const QRScanner = ({ onChange, label }: QRScannerProps): JSX.Element => {
       ) : null}
     </div>
   );
-}
+};
