@@ -7,7 +7,7 @@ function App() {
   const [value, setValue] = useState("")
    return (
      <div className="App">
-       <div>{value}</div>
+       <a href={value}>{value}</a>
        
        <QRScanner onChange={setValue} label="scan qr" />
      </div>

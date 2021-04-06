@@ -1,5 +1,6 @@
 import jsQR from "jsqr";
 import React, { useState } from "react";
+import ts from "typescript";
 import "./index.css";
 
 /*
@@ -18,13 +19,8 @@ const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
 
-  const tick = (): void => {
-    if (
-      canvas &&
-      canvasCtx &&
-      video &&
-      video.readyState === video.HAVE_ENOUGH_DATA
-    ) {
+  const scanVideoStreamForQRCode = (): void => {
+    if (canvasCtx && video && video.readyState === video.HAVE_ENOUGH_DATA) {
       canvas.height = video.videoHeight;
       canvas.width = video.videoWidth;
 
@@ -47,28 +43,43 @@ const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
         if (error! instanceof RangeError) throw error;
       }
     }
-    requestAnimationFrame(tick);
+    setTimeout(scanVideoStreamForQRCode, 200);
   };
 
   React.useEffect(() => {
-    let stream: MediaStream;
+    let mediaStream: MediaStream;
     if (videoRef.current) {
       setVideo(videoRef.current);
     }
     if (video) {
       navigator.mediaDevices
         .getUserMedia({ video: { facingMode: "environment" } })
-        .then(function (s) {
-          stream = s;
-          video.srcObject = stream;
+        .then(function (stream) {
+          mediaStream = stream;
+          const [track] = mediaStream.getVideoTracks();
+
+          const capabilities = track.getCapabilities();
+          // TODO - fix type declarations
+          //@ts-ignore
+          if (capabilities.zoom) {
+            //@ts-ignore
+            const zoom = { zoom: capabilities.zoom.max };
+            const c = {
+              advanced: [ zoom ],
+            };
+            //@ts-ignore
+            track.applyConstraints(c);
+          }
+
+          video.srcObject = mediaStream;
           video.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
           video.play();
-          requestAnimationFrame(tick);
+          setTimeout(scanVideoStreamForQRCode, 1000);
         });
     }
     const cleanup = (): void => {
       // release webcam when it is no longer needed
-      stream?.getTracks().forEach((t) => {
+      mediaStream?.getTracks().forEach((t) => {
         t.stop();
       });
     };
