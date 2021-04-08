@@ -1,11 +1,12 @@
 import jsQR from "jsqr";
 import React, { useState } from "react";
-import ts from "typescript";
+import { ResizeImageInput } from "../resize-image-input";
 import "./index.css";
 
 /*
 Based on https://github.com/cozmo/jsQR/blob/master/docs/index.html 
 and https://betterprogramming.pub/add-an-html-canvas-into-your-react-app-176dab099a79
+Zoom from: https://developer.mozilla.org/en-US/docs/Web/API/MediaStream_Image_Capture_API
 */
 
 type ScannerProps = {
@@ -18,32 +19,51 @@ const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
 
   const videoRef = React.useRef<HTMLVideoElement>(null);
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
+  const [code, setCode] = useState("")
+  const [showScanImageButton, setShowScanImageButton] = useState(true);
+  let scanVideoStreamForQRCodeTimeoutId: NodeJS.Timeout;
 
-  const scanVideoStreamForQRCode = (): void => {
-    if (canvasCtx && video && video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.height = video.videoHeight;
-      canvas.width = video.videoWidth;
 
-      canvasCtx.drawImage(video, 0, 0, video.videoHeight, video.videoWidth);
-      const imageData = canvasCtx.getImageData(
-        0,
-        0,
-        video.videoHeight,
-        video.videoWidth
-      );
+  const scanImageForQRCode = (
+    imageSource: CanvasImageSource,
+    width: number,
+    height: number
+  ): boolean => {
+    if (canvasCtx) {
+      canvas.height = height;
+      canvas.width = width;
+
+      canvasCtx.drawImage(imageSource, 0, 0, width, height);
+      const imageData = canvasCtx.getImageData(0, 0, width, height);
       try {
         const code = jsQR(imageData.data, imageData.width, imageData.height, {
           inversionAttempts: "dontInvert",
         });
         if (code) {
-          onChange(code.data);
-          return;
+          setCode(code.data);
+
+          setTimeout(() => {
+            onChange(code.data);
+          }, 1000);
+          return true;
         }
       } catch (error) {
         if (error! instanceof RangeError) throw error;
       }
     }
-    setTimeout(scanVideoStreamForQRCode, 200);
+    return false;
+  };
+  
+
+  const scanVideoStreamForQRCode = (): void => {
+
+    if(code ){
+      return;
+    }
+    if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+      scanImageForQRCode(video, video.videoHeight, video.videoWidth);
+    }  
+    scanVideoStreamForQRCodeTimeoutId =  setTimeout(scanVideoStreamForQRCode, 200)
   };
 
   React.useEffect(() => {
@@ -56,40 +76,59 @@ const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
         .getUserMedia({ video: { facingMode: "environment" } })
         .then(function (stream) {
           mediaStream = stream;
-          const [track] = mediaStream.getVideoTracks();
 
-          const capabilities = track.getCapabilities();
-          // TODO - fix type declarations
-          //@ts-ignore
-          if (capabilities.zoom) {
-            //@ts-ignore
-            const zoom = { zoom: capabilities.zoom.max };
-            const c = {
-              advanced: [ zoom ],
-            };
-            //@ts-ignore
-            track.applyConstraints(c);
+          const [track] = mediaStream.getVideoTracks();
+          
+          const capabilities = track && track.getCapabilities && track.getCapabilities();
+
+          if (capabilities && capabilities.zoom) {
+         
+            track && track.applyConstraints({
+              advanced: [{ zoom: capabilities.zoom.min }],
+            });
           }
 
           video.srcObject = mediaStream;
-          video.setAttribute("playsinline", "true"); // required to tell iOS safari we don't want fullscreen
+
+          // required to tell iOS safari we don't want fullscreen
+          video.setAttribute("playsinline", "true");
           video.play();
-          setTimeout(scanVideoStreamForQRCode, 1000);
-        });
+          
+          scanVideoStreamForQRCodeTimeoutId = setTimeout(
+            scanVideoStreamForQRCode,
+            1000
+          );
+        }).then(() => {
+          setShowScanImageButton(false)
+        })
     }
     const cleanup = (): void => {
       // release webcam when it is no longer needed
       mediaStream?.getTracks().forEach((t) => {
         t.stop();
       });
+      clearTimeout( scanVideoStreamForQRCodeTimeoutId);
     };
     return cleanup;
   }, [video]);
 
+  const getQRFromBase64String = (base64EncodedImage: string) : void =>{
+    const img = new Image()
+    img.onload = () => {
+      const foundQrCode = scanImageForQRCode(img, img.width, img.height);
+      if (!foundQrCode) {
+        alert("could not find QR code im uploaded image. Please try again")
+      }
+    }
+    img.src = base64EncodedImage;
+  } 
+
   return (
     <div className="scanner">
+      {showScanImageButton && <ResizeImageInput label="Last opp bilde av QR code" onChange={getQRFromBase64String} maxWidth={640} maxHeight={480} />}
       <video className="scanner__video" ref={videoRef}></video>
-        <button onClick={() => onChange("")}>Avbryt</button>
+      <div className="scanner__code">{code}</div>
+      <button onClick={() => onChange("")}>Avbryt</button>
     </div>
   );
 };
