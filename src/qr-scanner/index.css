@@ -2,21 +2,53 @@
   width: 100vw;
   height: 100vh;
   background-color: white;
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  display: flex;
-  flex-wrap: wrap;
-  flex-direction: column;
+  overflow: auto;
 }
 
 .scanner__video {
   max-width: 100vw;
 }
 
-.scanner__code{
+.scanner__code {
   background-color: white;
   font-size: 24px;
   text-align: center;
-  transform: translateY(-20vh);
+  position: fixed;
+  top: 20vh;
+  width: 100%;
+}
+
+.scanner__error {
+  background-color: white;
+  color: red;
+  font-size: 24px;
+  position: fixed;
+  top: 20vh;
+  padding: 10px;
+}
+
+.scanner__video--hidden {
+  display: none;
+}
+
+#scanner__buttons {
+  width: 100%;
+  position: fixed;
+  bottom: 5vh;
+  display: flex;
+  flex-wrap: wrap;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.scanner__buttons__background {
+  background-color: white;
+}
+
+.scanner__image {
+  max-width: 100%;
 }
