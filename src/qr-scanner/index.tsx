@@ -141,9 +141,9 @@ const Scanner = ({ onChange }: ScannerProps): JSX.Element => {
         ref={videoRef}
       ></video>
       {img && <img className="scanner__image" alt="Uploaded image" src={img} />}
-      <div className="scanner__code">{code}</div>
+      { code && <div className="scanner__code">{code}</div>}
 
-      <div className="scanner__error">{error}</div>
+      {error && <div className="scanner__error">{error}</div>}
       <div id="scanner__buttons">
         {showScanImageButton && (
           <ResizeImageInput
